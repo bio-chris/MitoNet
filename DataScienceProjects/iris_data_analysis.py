@@ -42,7 +42,7 @@ from sklearn.svm import SVC
 from sklearn.tree import DecisionTreeClassifier
 
 
-data_path = "iris_data/irisdata.txt"
+data_path = "datasets/irisdata.txt"
 
 #transfer data from text file into pandas dataframe
 
