@@ -237,7 +237,7 @@ class myUnet(object):
         model = Model(input=inputs, output=conv10)
 
         # lr: learning rate
-        model.compile(optimizer=Adam(lr=1e-4), loss=self.weighted_pixelwise_crossentropy(inputs),
+        model.compile(optimizer=Adam(lr=1e-4), loss=self.pixelwise_crossentropy(),
                       metrics=['accuracy', self.dice_coefficient])
 
         return model
@@ -251,11 +251,11 @@ class myUnet(object):
 
         intersection = K.sum(y_true_f * y_pred_f)
 
-        dice = -(2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
+        dice = (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
         return dice
 
-    def weighted_pixelwise_crossentropy(self, class_weights):
+    def pixelwise_crossentropy(self):
 
         def loss(y_true, y_pred):
             return losses.binary_crossentropy(y_true, y_pred)
@@ -292,7 +292,7 @@ class myUnet(object):
 
         model_checkpoint = ModelCheckpoint("data/unet.hdf5", monitor='loss', verbose=1, save_best_only=True)
 
-        history = model.fit(x=imgs_train, y=imgs_mask_train, batch_size=1, epochs=epochs, verbose=1,
+        history = model.fit(x=imgs_train, y=imgs_mask_train, batch_size=3, epochs=epochs, verbose=1,
                             validation_split=0.2, shuffle=True, callbacks=[model_checkpoint])
 
         """
