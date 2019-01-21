@@ -58,7 +58,8 @@ predict = False
 
 class myUnet(object):
 
-    def __init__(self, img_rows=656, img_cols=656, org_img_rows=1030, org_img_cols=1300):
+    # def __init__(self, img_rows=656, img_cols=656, org_img_rows=1030, org_img_cols=1300):
+    def __init__(self, img_rows=448, img_cols=448, org_img_rows=675, org_img_cols=884):
 
         self.img_rows = img_rows
         self.img_cols = img_cols
@@ -251,6 +252,7 @@ class myUnet(object):
 
         intersection = K.sum(y_true_f * y_pred_f)
 
+        # dice = -(2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
         dice = (2. * intersection + smooth) / (K.sum(y_true_f) + K.sum(y_pred_f) + smooth)
 
         return dice
@@ -322,6 +324,8 @@ class myUnet(object):
 
         org_img_rows = self.org_img_rows
         org_img_cols = self.org_img_cols
+
+        size = self.img_rows
 
         mydata = dataProcess(self.img_rows, self.img_cols)
 
@@ -424,22 +428,17 @@ class myUnet(object):
                         pic = cv2.imread(path + "/" + folder + "/" + img, cv2.IMREAD_GRAYSCALE)
 
                         if "0_" in img:
-
-                            # current_img[0:size, 0:size] = pic
-                            current_img[0:656, 0:656] = pic
+                            current_img[0:size, 0:size] = pic
 
                         elif "1_" in img:
-
-                            # current_img[0:size, org_img_cols-size-1:org_img_cols-1]
-                            current_img[0:656, 643:1299] = pic
+                            current_img[0:size, org_img_cols - size - 1:org_img_cols - 1] = pic
 
                         elif "2_" in img:
-                            # current_img[org_img_rows-size-1:org_img_rows-1, 0:size]
-                            current_img[373:1029, 0:656] = pic
+                            current_img[org_img_rows - size - 1:org_img_rows - 1, 0:size] = pic
 
                         else:
-                            # current_img[org_img_rows-size-1:org_img_rows-1, org_img_cols-size-1:org_img_cols-1]
-                            current_img[373:1029, 643:1299] = pic
+                            current_img[org_img_rows - size - 1:org_img_rows - 1,
+                            org_img_cols - size - 1:org_img_cols - 1] = pic
 
                     ### new section (01/10/18): removal of particles smaller than 10 px area
                     #####################
@@ -479,8 +478,8 @@ class myUnet(object):
 if __name__ == '__main__':
     myunet = myUnet()
 
-    myunet.train(epochs=50)
-    # myunet.predict()
+    #myunet.train(epochs=1)
+    myunet.predict()
 
     # K.clear_session()
 
