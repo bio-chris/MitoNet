@@ -5,6 +5,8 @@ https://github.com/zhixuhao/unet
 
 >>INSERT DESCRIPTION HERE<<
 
+
+
 Written for usage on pcd server
 
 Christian Fischer
@@ -48,9 +50,9 @@ from skimage.measure import label as set_labels, regionprops
 from scipy.ndimage.morphology import distance_transform_edt as get_dmap
 
 
-class preprocess(object):
+class Preprocess(object):
 
-    def __init__(self, train_path="data/train/image", label_path="data/train/label", raw_path="data/train/RawImgs",
+    def __init__(self, train_path="data/train/image", label_path="data/train/label", raw_path = "data/train/RawImgs",
                  img_type="tif"):
 
         """
@@ -63,10 +65,12 @@ class preprocess(object):
         self.raw_path = raw_path
         self.label_path = label_path
 
+
     def splitImgs(self):
 
+
         """
-        split original images (1300x1030) into 4 tiles of 656x656
+        split original images into 4 tiles of equal width and length
         """
 
         path_train = self.train_path
@@ -75,8 +79,19 @@ class preprocess(object):
 
         for img in os.listdir(path_raw + "/image"):
 
-            read_img = cv2.imread(path_raw + "/image/" + img, cv2.IMREAD_GRAYSCALE)
+
+            read_img = cv2.imread(path_raw + "/image/" + img, -1)
+
+            if np.sum(read_img) == 0:
+                print("Problem with reading image.\nAborting")
+                exit()
+
+            elif np.max(read_img) > 255:
+                print("Image bit depth is 16 or higher. Please convert images to 8-bit first.\nAborting")
+                exit()
+
             read_lab = cv2.imread(path_raw + "/label/" + img, cv2.IMREAD_GRAYSCALE)
+
 
             # get y and x resolution of image
             y, x = read_img.shape
@@ -116,7 +131,7 @@ class preprocess(object):
         return final_size
 
 
-class myAugmentation(object):
+class Augment(object):
     """
     A class used to augment image
     Firstly, read train image and label separately, and then merge them together for the next process
@@ -124,7 +139,7 @@ class myAugmentation(object):
     Finally, separate augmented image apart into train image and label
     """
 
-    def __init__(self, train_path="data/train/image", label_path="data/train/label", raw_path="data/train/RawImgs",
+    def __init__(self, train_path="data/train/image", label_path="data/train/label", raw_path = "data/train/RawImgs",
                  merge_path="data/merge", aug_merge_path="data/aug_merge", aug_train_path="data/aug_train",
                  aug_label_path="data/aug_label", img_type="tif", map_path="data/weights",
                  aug_map_path="data/aug_weights"):
@@ -157,7 +172,8 @@ class myAugmentation(object):
             height_shift_range=0.2,
             fill_mode='reflect')  # pixels outside boundary are set to 0
 
-    def Augmentation(self, imgnum):
+
+    def start_augmentation(self, imgnum):
 
         print("Starting Augmentation \n")
 
@@ -174,8 +190,8 @@ class myAugmentation(object):
 
         # checks if number of files in train and label folder are equal
         if len(trains) != len(labels) or len(trains) == 0 or len(trains) == 0:
-            print("trains can't match labels")
-            return 0
+            print("Number of train images does match number of label images.\nAborting")
+            exit()
 
         # iterate through folder, merge label, original images and save to merged folder
         for count, image in enumerate(os.listdir(path_train)):
@@ -187,16 +203,16 @@ class myAugmentation(object):
             # create empty array (only 0s) with shape (x,y, number of channels)
             aug_img = np.zeros((x_t.shape[0], x_l.shape[1], 3))
 
-            # setting each channel to label, weights and original
+            # setting each channel to label, empty array and original
             aug_img[:, :, 2] = x_l
             aug_img[:, :, 1] = x_w
             aug_img[:, :, 0] = x_t
+
 
             # write final merged image
             cv2.imwrite(path_merge + "/" + image, aug_img)
 
             img = aug_img
-
             img = img.reshape((1,) + img.shape)
 
             savedir = path_aug_merge + "/" + image
@@ -206,7 +222,7 @@ class myAugmentation(object):
 
             self.doAugmentate(img, savedir, image, imgnum)
 
-    def doAugmentate(self, img, save_to_dir, save_prefix, imgnum, batch_size=1, save_format='tif'):
+    def doAugmentate(self, img, save_to_dir, save_prefix, imgnum , batch_size=1, save_format='tif'):
 
         """
         augment one image
@@ -218,7 +234,6 @@ class myAugmentation(object):
                                   save_to_dir=save_to_dir,
                                   save_prefix=save_prefix,
                                   save_format=save_format):
-
             i += 1
 
             if i >= imgnum:
@@ -226,7 +241,7 @@ class myAugmentation(object):
 
     def splitMerge(self):
 
-        print("\nSplitting merged images")
+        print("Splitting merged images")
 
         """
         split merged image apart
@@ -234,6 +249,7 @@ class myAugmentation(object):
         path_merge = self.aug_merge_path
         path_train = self.aug_train_path
         path_label = self.aug_label_path
+
 
         for image in os.listdir(path_merge):
 
@@ -249,21 +265,21 @@ class myAugmentation(object):
             if not os.path.lexists(savedir):
                 os.mkdir(savedir)
 
+
             for imgname in train_imgs:
                 midname = imgname.split("/")[3]
                 img = cv2.imread(imgname)
 
-                # img_train = img[:,:,0]#cv2 read image rgb->bgr
                 img_train = img[:, :, 2]  # cv2 read image rgb->bgr
                 img_label = img[:, :, 0]
 
                 cv2.imwrite(path_train + "/" + image + "/" + midname, img_train)
                 cv2.imwrite(path_label + "/" + image + "/" + midname, img_label)
 
-        print("\n splitMerge finished")
+        print("\nsplitMerge finished")
 
 
-class dataProcess(object):
+class Create_npy_files(object):
 
     def __init__(self, out_rows, out_cols, data_path="data/aug_train", label_path="data/aug_label",
                  test_path="data/test", weight_path="data/aug_weights", npy_path="data/npydata", img_type="tif"):
@@ -300,8 +316,10 @@ class dataProcess(object):
         # original
         imgs = glob.glob(self.data_path + "/*/*")
 
+
         imgdatas = np.ndarray((len(imgs), self.out_rows, self.out_cols, 1), dtype=np.uint8)
         imglabels = np.ndarray((len(imgs), self.out_rows, self.out_cols, 1), dtype=np.uint8)
+
 
         for imgname in imgs:
 
@@ -319,11 +337,12 @@ class dataProcess(object):
             imgdatas[i] = img
             imglabels[i] = label
 
+
             if i % 100 == 0:
                 print('Done: {0}/{1} images'.format(i, len(imgs)))
             i += 1
 
-        print('loading done')
+        print('Loading done')
 
         # original
         np.save(self.npy_path + '/imgs_train.npy', imgdatas)
@@ -331,11 +350,12 @@ class dataProcess(object):
 
         print('Saving to .npy files done.')
 
+
     # is used in unet.py script
     def load_train_data(self):
 
         print('-' * 30)
-        print('load train images...')
+        print('Load train images...')
         print('-' * 30)
 
         imgs_train = np.load(self.npy_path + "/imgs_train.npy")
@@ -352,15 +372,13 @@ class dataProcess(object):
 
         return imgs_train, imgs_mask_train
 
-    # is used in unet.py script
+    # is used in MitoSegNet.py script
     def create_test_data(self):
 
         """
-
         adding all image data to one numpy array file (npy)
 
         all original image files are added to imgs_test.npy
-
         """
 
         i = 0
@@ -375,6 +393,7 @@ class dataProcess(object):
         if any("_" in s for s in imgs):
 
             for img in imgs:
+
                 new_img = img.replace("_", "-")
                 os.rename(img, new_img)
 
@@ -403,22 +422,20 @@ class dataProcess(object):
             c = 0
             while c <= 3:
                 mod_imgs.append(part[0] + "/" + part[1] + "/" + str(c) + "_" + part[2])
-                c += 1
+                c+=1
 
         ################
 
-        imgdatas = np.ndarray((len(imgs) * 4, self.out_rows, self.out_cols, 1), dtype=np.uint8)
-        print(len(imgdatas))
+        imgdatas = np.ndarray((len(imgs)*4, self.out_rows, self.out_cols, 1), dtype=np.uint8)
+
 
         for imgname in imgs:
             print(imgname)
 
-            # midname = imgname[imgname.rindex("/") + 1:]
-
             img = cv2.imread(imgname, cv2.IMREAD_GRAYSCALE)
 
             # insert split into 4 sub-images here
-            ################################################### (09/11/18) not tested yet
+            ################################################### (09/11/18)
 
             y, x = img.shape
             size = max(img.shape) / 2
@@ -428,15 +445,14 @@ class dataProcess(object):
 
             final_size = int(size)
 
-            def test_splitter(img_corner, i, final_size=final_size):
+            def test_splitter(img_corner, i, final_size = final_size):
 
                 img = img_corner
-
                 img = img.reshape((final_size, final_size, 1))
 
                 imgdatas[i] = img
 
-                i += 1
+                i+=1
 
                 return i
 
@@ -447,19 +463,20 @@ class dataProcess(object):
             # lower left corner
             i = test_splitter(img[y - final_size:y, 0:final_size], i)
             # lower right corner
-            i = test_splitter(img[y - final_size:y, x - final_size:x], i)
+            i= test_splitter(img[y - final_size:y, x - final_size:x], i)
 
-        print('loading done')
+
+        print('Loading done')
         np.save(self.npy_path + '/imgs_test.npy', imgdatas)
         print('Saving to imgs_test.npy files done.')
 
         return mod_imgs
 
-    # used in unet.py script
+    # used in MitoSegNet.py script
     def load_test_data(self):
 
         print('-' * 30)
-        print('load test images...')
+        print('Load test images...')
         print('-' * 30)
 
         imgs_test = np.load(self.npy_path + "/imgs_test.npy")
@@ -471,19 +488,20 @@ class dataProcess(object):
 
 
 if __name__ == "__main__":
-    split = preprocess()
+
+    split = Preprocess()
 
     width = split.splitImgs()
     height = width
 
-    print("New image size is: ", width, "x", height)
+    print("New image size is: ", width,"x",height)
 
-    aug = myAugmentation()
+    aug = Augment()
 
-    aug.Augmentation(imgnum=80)
+    aug.start_augmentation(imgnum=80)
     aug.splitMerge()
 
-    mydata = dataProcess(width, height)
+    mydata = Create_npy_files(width, height)
     mydata.create_train_data()
 
 
