@@ -66,11 +66,16 @@ for file, method_name in zip(file_list, all_data):
 
 #print(all_data)
 
-significance_bar(pos_y=4, pos_x=[0, 4], bar_y=0.03, p=3, y_dist=0.1, distance=0.1)
-significance_bar(pos_y=3, pos_x=[2, 4], bar_y=0.03, p=1, y_dist=0.1, distance=0.1)
+significance_bar(pos_y=6.4, pos_x=[0, 4], bar_y=0.03, p=3, y_dist=0.1, distance=0.1)
+significance_bar(pos_y=6.1, pos_x=[2, 4], bar_y=0.03, p=1, y_dist=0.1, distance=0.1)
 
 
-sb.boxplot(data=all_data, fliersize=0).set(ylabel="Average fold deviation from gt measurement")
+#n = sb.boxplot(data=all_data, color="white", fliersize=0)
+n = sb.violinplot(data=all_data, color="white", inner="points")
+
+n.set_ylabel("Average fold deviation\n(single and multi\nobject correspondence)", fontsize=14)
+n.tick_params(labelsize=12)
+
 
 """
 all_data["Gaussian"] = np.log(all_data["Gaussian"])
@@ -87,21 +92,42 @@ sb.distplot(all_data["Ilastik"], color="red", label="Ilastik", hist=False)
 sb.distplot(all_data["MitoNet"], color="purple", label="MitoNet", hist=False).set(xlabel="Log average fold deviation from gt measurement per object")
 """
 
-plt.show()
+#plt.show()
 
 
 
 
-"""
+#"""
 print(normaltest(all_data["Gaussian"])[1])
 print(normaltest(all_data["Hessian"])[1])
 print(normaltest(all_data["Laplacian"])[1])
 print(normaltest(all_data["Ilastik"])[1])
 print(normaltest(all_data["MitoNet"])[1])
-"""
+#"""
+
+print("\n")
 
 #print(ttest_ind(h, u)[1])
+print(mannwhitneyu(all_data["Gaussian"], all_data["MitoNet"])[1])
+print(mannwhitneyu(all_data["Hessian"], all_data["MitoNet"])[1])
+print(mannwhitneyu(all_data["Laplacian"], all_data["MitoNet"])[1])
 print(mannwhitneyu(all_data["Ilastik"], all_data["MitoNet"])[1])
+
+
+def cohens_d(data1, data2):
+
+    p_std = np.sqrt(((len(data1)-1)*np.var(data1)+(len(data2)-1)*np.var(data2))/(len(data1)+len(data2)-2))
+
+    cohens_d = np.abs(np.average(data1) - np.average(data2)) / p_std
+
+    return cohens_d
+
+print("\n")
+
+print(cohens_d(all_data["Gaussian"], all_data["MitoNet"]))
+print(cohens_d(all_data["Hessian"], all_data["MitoNet"]))
+print(cohens_d(all_data["Laplacian"], all_data["MitoNet"]))
+print(cohens_d(all_data["Ilastik"], all_data["MitoNet"]))
 
 #sb.distplot(h, color="red")
 #sb.distplot(u, color="blue")

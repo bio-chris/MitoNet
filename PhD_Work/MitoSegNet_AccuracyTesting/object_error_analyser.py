@@ -61,10 +61,12 @@ for file, method in zip(file_list, all_data):
 
         l = []
         for merge, split, add in zip(table["falsely merged"], table["falsely split"], table["falsely added"]):
+        #for missing in table["missing"]:
 
             #print(merge,split,add)
-            l.append(merge+split+add)
 
+            l.append(merge+split+add)
+            #l.append(missing)
 
         all_data[method] = l
 
@@ -72,18 +74,23 @@ print(all_data)
 
 
 
-"""
+#"""
 print(normaltest(all_data["Gaussian"])[1])
 print(normaltest(all_data["Hessian"])[1])
 print(normaltest(all_data["Laplacian"])[1])
 print(normaltest(all_data["Ilastik"])[1])
 print(normaltest(all_data["MitoNet"])[1], "\n")
-"""
+#"""
 
 method = "Ilastik"
 
 #print(mannwhitneyu(all_data[method], all_data["MitoNet"])[1])
 #print(ttest_ind(all_data[method], all_data["MitoNet"])[1])
+
+print(ttest_ind(all_data["Gaussian"], all_data["MitoNet"])[1])
+print(ttest_ind(all_data["Hessian"], all_data["MitoNet"])[1])
+print(ttest_ind(all_data["Laplacian"], all_data["MitoNet"])[1])
+print(ttest_ind(all_data["Ilastik"], all_data["MitoNet"])[1])
 
 """
 all_data["Gaussian"] = np.log(all_data["Gaussian"])
@@ -100,9 +107,35 @@ sb.distplot(all_data["Ilastik"], color="red", label="Ilastik", hist=False)
 sb.distplot(all_data["MitoNet"], color="purple", label="MitoNet", hist=False).set(xlabel="Percent of wrongly segmented objects")
 """
 
-sb.boxplot(data=all_data).set(ylabel="Percent of wrongly segmented objects")
 
-significance_bar(pos_y=1.4, pos_x=[0, 4], bar_y=0.03, p=2, y_dist=0.1, distance=0.1)
-significance_bar(pos_y=1.1, pos_x=[2, 4], bar_y=0.03, p=3, y_dist=0.1, distance=0.1)
+def cohens_d(data1, data2):
+
+    p_std = np.sqrt(((len(data1)-1)*np.var(data1)+(len(data2)-1)*np.var(data2))/(len(data1)+len(data2)-2))
+
+    cohens_d = np.abs(np.average(data1) - np.average(data2)) / p_std
+
+    return cohens_d
+
+print("\n")
+
+print(cohens_d(all_data["Gaussian"], all_data["MitoNet"]))
+print(cohens_d(all_data["Hessian"], all_data["MitoNet"]))
+print(cohens_d(all_data["Laplacian"], all_data["MitoNet"]))
+print(cohens_d(all_data["Ilastik"], all_data["MitoNet"]))
+
+
+
+
+n = sb.violinplot(data=all_data, color="white", inner="points")#.set(ylabel="Percent of wrongly\nsegmented objects")
+
+#n.set_ylabel("Percent of wrongly\nsegmented objects", fontsize=14)
+
+n.set_ylabel("Percent of missing objects", fontsize=16)
+
+n.tick_params(labelsize=14)
+
+
+#significance_bar(pos_y=1.4, pos_x=[0, 4], bar_y=0.03, p=2, y_dist=0.1, distance=0.1)
+#significance_bar(pos_y=1.2, pos_x=[2, 4], bar_y=0.03, p=3, y_dist=0.1, distance=0.1)
 
 plt.show()

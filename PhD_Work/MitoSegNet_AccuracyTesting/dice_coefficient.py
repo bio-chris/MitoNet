@@ -31,7 +31,7 @@ gt_folder = "Ground_Truth"
 gauss_folder = "Gaussian"
 hess_folder = "Hessian"
 laplac_folder = "Laplacian"
-il_folder = "Ilastik/post_processed"
+il_folder = "Ilastik"
 
 unet_folder1 = "U-Net/1_epoch"
 unet_folder5 = "U-Net/5_epochs"
@@ -118,10 +118,14 @@ y = [1,1]
 
 # pos_y and pos_x determine position of bar, p sets the number of asterisks, y_dist sets y distance of the asterisk to
 # bar, and distance sets the distance between two or more asterisks
-#significance_bar(pos_y=1, pos_x=[0, 4], bar_y=0.03, p=1, y_dist=0.02, distance=0.1)
+significance_bar(pos_y=1.1, pos_x=[0, 4], bar_y=0.03, p=1, y_dist=0.02, distance=0.1)
 
-#sb.boxplot(data=all_data).set(ylabel="Dice coefficient")
-#plt.show()
+n = sb.violinplot(data=all_data, color="white", inner="points")
+n.set_ylabel("Dice coefficient", fontsize=16)
+n.tick_params(labelsize=12)
+plt.show()
+
+exit()
 
 sb.distplot(ga_l, color="blue", label="Gaussian", hist=False)
 sb.distplot(h_l, color="orange", label="Hessian", hist=False)
