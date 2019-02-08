@@ -26,13 +26,12 @@ number of max pooling layers: 4
 
 """
 
-
 import pandas as pd
 from keras.models import *
-from keras.layers import Input, merge, Conv2D, MaxPooling2D, UpSampling2D, Activation, BatchNormalization
+from keras.layers import Input, concatenate, Conv2D, MaxPooling2D, UpSampling2D, Activation, BatchNormalization, Dropout
 from keras.optimizers import *
 from keras import backend as K
-from keras.callbacks import ModelCheckpoint, EarlyStopping
+from keras.callbacks import ModelCheckpoint, EarlyStopping, CSVLogger
 from keras.initializers import RandomNormal as gauss
 from keras.preprocessing.image import array_to_img
 from keras import losses
@@ -55,8 +54,6 @@ max pooling operations are applied to a layer with an even x and y size
 """
 
 
-
-
 class MitoSegNet(object):
 
     def __init__(self, img_rows=656, img_cols=656, org_img_rows=1030, org_img_cols=1300):
@@ -76,9 +73,7 @@ class MitoSegNet(object):
 
         return imgs_train, imgs_mask_train
 
-
     def get_mitosegnet(self):
-
 
         inputs = Input(shape=(self.img_rows, self.img_cols, 1))
         print(inputs.get_shape(), type(inputs))
@@ -116,6 +111,9 @@ class MitoSegNet(object):
 
         """
 
+        # batchnorm architecture
+        ######################################################################
+        # """
 
         conv1 = Conv2D(64, 3, padding='same', kernel_initializer=gauss())(inputs)
         print("conv1 shape:", conv1.shape)
@@ -181,55 +179,108 @@ class MitoSegNet(object):
 
         up6 = Conv2D(512, 2, activation='relu', padding='same',
                      kernel_initializer=gauss(stddev=sqrt(2 / (9 * 1024))))(UpSampling2D(size=(2, 2))(act5))
-        merge6 = merge([conv4, up6], mode='concat', concat_axis=3)
+
+        merge6 = concatenate([conv4, up6], axis=3)
+        # merge6 = merge([act4, up6], mode='concat', concat_axis=3)
 
         conv6 = Conv2D(512, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 512))))(merge6)
         conv6 = Conv2D(512, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 512))))(conv6)
 
-
         up7 = Conv2D(256, 2, activation='relu', padding='same',
                      kernel_initializer=gauss(stddev=sqrt(2 / (9 * 512))))(UpSampling2D(size=(2, 2))(conv6))
-        merge7 = merge([conv3, up7], mode='concat', concat_axis=3)
+
+        merge7 = concatenate([conv3, up7], axis=3)
+        # merge7 = merge([act3, up7], mode='concat', concat_axis=3)
 
         conv7 = Conv2D(256, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 256))))(merge7)
         conv7 = Conv2D(256, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 256))))(conv7)
 
-
         up8 = Conv2D(128, 2, activation='relu', padding='same',
                      kernel_initializer=gauss(stddev=sqrt(2 / (9 * 256))))(UpSampling2D(size=(2, 2))(conv7))
 
-        merge8 = merge([conv2, up8], mode='concat', concat_axis=3)
+        merge8 = concatenate([conv2, up8], axis=3)
+        # merge8 = merge([act2, up8], mode='concat', concat_axis=3)
 
         conv8 = Conv2D(128, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 128))))(merge8)
         conv8 = Conv2D(128, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 128))))(conv8)
 
-
         up9 = Conv2D(64, 2, activation='relu', padding='same',
                      kernel_initializer=gauss(stddev=sqrt(2 / (9 * 128))))(UpSampling2D(size=(2, 2))(conv8))
-        merge9 = merge([conv1, up9], mode='concat', concat_axis=3)
+
+        merge9 = concatenate([conv1, up9], axis=3)
+        # merge9 = merge([act1, up9], mode='concat', concat_axis=3)
 
         conv9 = Conv2D(64, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 64))))(merge9)
         conv9 = Conv2D(64, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 64))))(conv9)
 
-
         conv9 = Conv2D(2, 3, activation='relu', padding='same',
                        kernel_initializer=gauss(stddev=sqrt(2 / (9 * 64))))(conv9)
 
+        # """
+        ######################################################################
+
+        # dropout architecture
+        ######################################################################
+        """
+        conv1 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer=gauss())(inputs)
+        conv1 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 64))))(conv1)
+        pool1 = MaxPooling2D(pool_size=(2, 2))(conv1)
+
+        conv2 = Conv2D(128, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 64))))(pool1)
+        conv2 = Conv2D(128, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 128))))(conv2)
+        pool2 = MaxPooling2D(pool_size=(2, 2))(conv2)
+
+        conv3 = Conv2D(256, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 128))))(pool2)
+        conv3 = Conv2D(256, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 256))))(conv3)
+        pool3 = MaxPooling2D(pool_size=(2, 2))(conv3)
+
+        conv4 = Conv2D(512, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 256))))(pool3)
+        conv4 = Conv2D(512, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 512))))(conv4)
+        drop4 = Dropout(0.5)(conv4)
+        pool4 = MaxPooling2D(pool_size=(2, 2))(drop4)
+
+        conv5 = Conv2D(1024, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 512))))(pool4)
+        conv5 = Conv2D(1024, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 1024))))(conv5)
+        drop5 = Dropout(0.5)(conv5)
+
+        up6 = Conv2D(512, 2, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 1024))))(
+            UpSampling2D(size=(2, 2))(drop5))
+        merge6 = concatenate([drop4, up6], axis=3)
+        conv6 = Conv2D(512, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 512))))(merge6)
+        conv6 = Conv2D(512, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 512))))(conv6)
+
+        up7 = Conv2D(256, 2, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 512))))(
+            UpSampling2D(size=(2, 2))(conv6))
+        merge7 = concatenate([conv3, up7], axis=3)
+        conv7 = Conv2D(256, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 256))))(merge7)
+        conv7 = Conv2D(256, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 256))))(conv7)
+
+        up8 = Conv2D(128, 2, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 256))))(
+            UpSampling2D(size=(2, 2))(conv7))
+        merge8 = concatenate([conv2, up8], axis=3)
+        conv8 = Conv2D(128, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 128))))(merge8)
+        conv8 = Conv2D(128, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 128))))(conv8)
+
+        up9 = Conv2D(64, 2, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 128))))(
+            UpSampling2D(size=(2, 2))(conv8))
+        merge9 = concatenate([conv1, up9], axis=3)
+        conv9 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 64))))(merge9)
+        conv9 = Conv2D(64, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 64))))(conv9)
+        conv9 = Conv2D(2, 3, activation='relu', padding='same', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 64))))(conv9)
+        """
+        ######################################################################
 
         conv10 = Conv2D(1, 1, activation='sigmoid', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 2))))(conv9)
 
-
-
         model = Model(input=inputs, output=conv10)
-
 
         model.compile(optimizer=Adam(lr=1e-4), loss=self.pixelwise_crossentropy(),
                       metrics=['accuracy', self.dice_coefficient])
@@ -252,14 +303,11 @@ class MitoSegNet(object):
     def pixelwise_crossentropy(self):
 
         def loss(y_true, y_pred):
-
             return losses.binary_crossentropy(y_true, y_pred)
 
         return loss
 
-
     def train(self, epochs):
-
 
         print("Loading data")
 
@@ -269,7 +317,6 @@ class MitoSegNet(object):
         model = self.get_mitosegnet()
         print("Got mitosegnet")
 
-
         if os.path.isfile('data/mitosegnet.hdf5'):
 
             model.load_weights('data/mitosegnet.hdf5')
@@ -278,26 +325,25 @@ class MitoSegNet(object):
         else:
             print("No previously optimized weights were loaded. Proceeding without")
 
-
         # Set network weights saving mode.
         # save previously established network weights (saving model after every epoch)
 
         print('Fitting model...')
 
+        csv_logger = CSVLogger('data/training_log.csv')
+
         # Set callback functions to early stop training and save the best model so far
-        callbacks = [EarlyStopping(monitor='val_loss', patience=2),
-                     ModelCheckpoint(filepath='data/mitosegnet.hdf5', monitor='val_loss', verbose=1, save_best_only=True)]
+        callbacks = [EarlyStopping(monitor='val_loss', patience=5),
+                     ModelCheckpoint(filepath='data/mitosegnet.hdf5', monitor='val_loss', verbose=1,
+                                     save_best_only=True),
+                     csv_logger]
 
+        # model_checkpoint = ModelCheckpoint("data/unet.hdf5", monitor='loss', verbose=1, save_best_only=True)
 
-        #model_checkpoint = ModelCheckpoint("data/unet.hdf5", monitor='loss', verbose=1, save_best_only=True)
+        model.fit(x=imgs_train, y=imgs_mask_train, batch_size=3, epochs=epochs, verbose=1,
+                  validation_split=0.2, shuffle=True, callbacks=callbacks)
 
-        history = model.fit(x=imgs_train, y=imgs_mask_train, batch_size=3, epochs=epochs, verbose=1,
-                            validation_split=0.2, shuffle=True, callbacks=callbacks)
-
-
-        pd.DataFrame(history.history).to_csv("data/train_history_mitosegnet.csv")
-
-
+        # pd.DataFrame(history.history).to_csv("data/train_history_mitosegnet.csv")
 
     def predict(self):
 
@@ -314,9 +360,8 @@ class MitoSegNet(object):
         l_imgs = mydata.create_test_data()
         imgs_test = mydata.load_test_data()
 
-
+        # predict if no npy array exists yet
         if not os.path.isfile("data/results/imgs_mask_test.npy"):
-
             model = self.get_mitosegnet()
             model.load_weights("data/mitosegnet.hdf5")
 
@@ -328,12 +373,7 @@ class MitoSegNet(object):
 
             np.save('data/results/imgs_mask_test.npy', imgs_mask_test)
 
-
-
-        #######################
-
         org_img_list = list(set(list([n.split("_")[1] for n in l_imgs if ".tif" in n])))
-
 
         def atoi(text):
             return int(text) if text.isdigit() else text
@@ -341,9 +381,8 @@ class MitoSegNet(object):
         def natural_keys(text):
             return [atoi(c) for c in re.split('(\d+)', text)]
 
-        #alphanumeric sorting of list elements
+        # alphanumeric sorting of list elements
         org_img_list.sort(key=natural_keys)
-
 
         # saving arrays as images
         print("Array to image")
@@ -366,8 +405,7 @@ class MitoSegNet(object):
             img = array_to_img(img)
 
             imgname = image[image.rindex("/") + 1:]
-            #print(imgname)
-
+            # print(imgname)
 
             # stitching the four sub-images back together
             if "0_" in imgname:
@@ -383,12 +421,10 @@ class MitoSegNet(object):
                 current_img[org_img_rows - size - 1:org_img_rows - 1,
                 org_img_cols - size - 1:org_img_cols - 1] = img
 
-
             img_nr += 1
 
             # once one image has been fully stitched, remove any objects below 10 px size and save
             if img_nr == 4:
-
                 label_image, num_features = label(current_img)
                 new_image = remove_small_objects(label_image, 10)
                 new_image[new_image != 0] = 255
@@ -397,19 +433,17 @@ class MitoSegNet(object):
 
                 cv2.imwrite("data/results/" + org_img_list[org_img_list_index], new_image)
 
-                org_img_list_index+=1
+                org_img_list_index += 1
                 img_nr = 0
 
 
-
 if __name__ == '__main__':
-
     mitosegnet = MitoSegNet()
 
-    #mitosegnet.train(epochs=1)
-    mitosegnet.predict()
+    mitosegnet.train(epochs=20)
+    # mitosegnet.predict()
 
-    #K.clear_session()
+    # K.clear_session()
 
 
 

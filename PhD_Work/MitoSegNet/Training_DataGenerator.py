@@ -498,7 +498,7 @@ if __name__ == "__main__":
 
     aug = Augment()
 
-    aug.start_augmentation(imgnum=80)
+    aug.start_augmentation(imgnum=100)
     aug.splitMerge()
 
     mydata = Create_npy_files(width, height)
