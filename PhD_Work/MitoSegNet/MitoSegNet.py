@@ -64,16 +64,23 @@ class MitoSegNet(object):
         self.org_img_rows = org_img_rows
         self.org_img_cols = org_img_cols
 
-    def load_data(self):
+    def load_data(self, wmap):
 
         mydata = Create_npy_files(self.img_rows, self.img_cols)
 
-        imgs_train, imgs_mask_train = mydata.load_train_data()
-        print(imgs_mask_train.shape)
+        if wmap == False:
 
-        return imgs_train, imgs_mask_train
+            imgs_train, imgs_mask_train = mydata.load_train_data(wmap=wmap)
+            print(imgs_mask_train.shape)
+            return imgs_train, imgs_mask_train
 
-    def get_mitosegnet(self):
+        else:
+
+            imgs_train, imgs_mask_train, imgs_weights = mydata.load_train_data(wmap=wmap)
+            print(imgs_mask_train.shape)
+            return imgs_train, imgs_mask_train, imgs_weights
+
+    def get_mitosegnet(self, wmap):
 
         inputs = Input(shape=(self.img_rows, self.img_cols, 1))
         print(inputs.get_shape(), type(inputs))
@@ -280,10 +287,21 @@ class MitoSegNet(object):
 
         conv10 = Conv2D(1, 1, activation='sigmoid', kernel_initializer=gauss(stddev=sqrt(2 / (9 * 2))))(conv9)
 
-        model = Model(input=inputs, output=conv10)
+        if wmap == False:
+            input = inputs
+            loss = self.pixelwise_crossentropy()
+        else:
+            weights = Input(shape=(self.img_rows, self.img_cols, 1))
+            input = [inputs, weights]
 
-        model.compile(optimizer=Adam(lr=1e-4), loss=self.pixelwise_crossentropy(),
-                      metrics=['accuracy', self.dice_coefficient])
+            loss = self.weighted_pixelwise_crossentropy(input[1])
+
+        model = Model(input=input, output=conv10)
+
+        model.compile(optimizer=Adam(lr=1e-4), loss=loss, metrics=['accuracy', self.dice_coefficient])
+
+        # model.compile(optimizer=Adam(lr=1e-4), loss=self.pixelwise_crossentropy(input[1]),
+        #              metrics=['accuracy', self.dice_coefficient])
 
         return model
 
@@ -307,14 +325,25 @@ class MitoSegNet(object):
 
         return loss
 
-    def train(self, epochs):
+    def weighted_pixelwise_crossentropy(self, wmap):
+
+        def loss(y_true, y_pred):
+            return losses.binary_crossentropy(y_true, y_pred) * wmap
+
+        return loss
+
+    def train(self, epochs, wmap):
 
         print("Loading data")
 
-        imgs_train, imgs_mask_train = self.load_data()
+        if wmap == False:
+            imgs_train, imgs_mask_train = self.load_data(wmap=wmap)
+        else:
+            imgs_train, imgs_mask_train, img_weights = self.load_data(wmap=wmap)
+
         print("Loading data done")
 
-        model = self.get_mitosegnet()
+        model = self.get_mitosegnet(wmap=wmap)
         print("Got mitosegnet")
 
         if os.path.isfile('data/mitosegnet.hdf5'):
@@ -338,14 +367,18 @@ class MitoSegNet(object):
                                      save_best_only=True),
                      csv_logger]
 
-        # model_checkpoint = ModelCheckpoint("data/unet.hdf5", monitor='loss', verbose=1, save_best_only=True)
+        if wmap == True:
+            x = [imgs_train, img_weights]
+            bs = 1
 
-        model.fit(x=imgs_train, y=imgs_mask_train, batch_size=3, epochs=epochs, verbose=1,
+        else:
+            x = imgs_train
+            bs = 3
+
+        model.fit(x=x, y=imgs_mask_train, batch_size=bs, epochs=epochs, verbose=1,
                   validation_split=0.2, shuffle=True, callbacks=callbacks)
 
-        # pd.DataFrame(history.history).to_csv("data/train_history_mitosegnet.csv")
-
-    def predict(self):
+    def predict(self, wmap):
 
         """
         :return:
@@ -362,7 +395,7 @@ class MitoSegNet(object):
 
         # predict if no npy array exists yet
         if not os.path.isfile("data/results/imgs_mask_test.npy"):
-            model = self.get_mitosegnet()
+            model = self.get_mitosegnet(wmap=wmap)
             model.load_weights("data/mitosegnet.hdf5")
 
             print('Predict test data')
@@ -440,8 +473,8 @@ class MitoSegNet(object):
 if __name__ == '__main__':
     mitosegnet = MitoSegNet()
 
-    mitosegnet.train(epochs=20)
-    # mitosegnet.predict()
+    mitosegnet.train(epochs=20, wmap=True)
+    # mitosegnet.predict(wmap=False)
 
     # K.clear_session()
 

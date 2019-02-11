@@ -41,7 +41,7 @@ No weight map is used
 
 import numpy as np
 import os
-import shutil
+import copy
 import glob
 import cv2
 import re
@@ -141,8 +141,8 @@ class Augment(object):
 
     def __init__(self, train_path="data/train/image", label_path="data/train/label", raw_path = "data/train/RawImgs",
                  merge_path="data/merge", aug_merge_path="data/aug_merge", aug_train_path="data/aug_train",
-                 aug_label_path="data/aug_label", img_type="tif", map_path="data/weights",
-                 aug_map_path="data/aug_weights"):
+                 aug_label_path="data/aug_label", img_type="tif",
+                 weights_path="data/weights", aug_weights_path="data/aug_weights"):
 
         """
         Using glob to get all .img_type form path
@@ -157,11 +157,12 @@ class Augment(object):
         self.img_type = img_type
         self.aug_merge_path = aug_merge_path
         self.aug_train_path = aug_train_path
+        self.aug_weights_path = aug_weights_path
         self.aug_label_path = aug_label_path
         self.slices = len(self.train_imgs)
 
-        self.map_path = map_path
-        self.aug_map_path = aug_map_path
+        self.map_path = weights_path
+        #self.aug_map_path = aug_map_path
 
         # ImageDataGenerator performs augmentation on original images
         self.datagen = ImageDataGenerator(
@@ -173,7 +174,75 @@ class Augment(object):
             fill_mode='reflect')  # pixels outside boundary are set to 0
 
 
-    def start_augmentation(self, imgnum):
+
+
+
+    def start_augmentation(self, imgnum, wmap):
+
+
+        def create_weight_map(label, w0=10, sigma=5):
+
+            # creating first parameter of weight map formula
+            class_weight_map = np.ones_like(label)
+            class_weight_map[label > 0] = 2
+
+            # setting all 255 values to 1
+            label[label > 1] = 1
+            # inverting label for distance_transform
+            new_label = 1 - label
+
+            # calculate distance_transform
+            dist_map1 = get_dmap(new_label)
+
+            # labels each separable object with one unique pixel value
+            labelled = set_labels(label)
+
+            # creates list with label properties (for us important: coordinates)
+            regprops = regionprops(labelled)
+
+            stack = []
+
+            # iterate through every object in image
+            for i in regprops:
+
+                # create shallow copy of new_label (modifying matrix, without changing original)
+                temp = copy.copy(new_label)
+
+                # iterate through coordinates of each object
+                for n in i.coords:
+                    # create one image each, in which one object is removed (background = 1)
+                    temp[n[0], n[1]] = 1
+
+                stack.append(get_dmap(temp))
+
+            # create empty matrix
+            dist_map2 = np.zeros_like(label)
+
+            x = 0
+            # iterate through each row of distance map 1
+            for row in dist_map1:
+
+                y = 0
+                # iterate through each column
+                for col in row:
+                    for img in stack:
+
+                        # check if at position x,y the pixel value of img is bigger than dist_map1 >> distance to second nearest border
+                        if img[x, y] > dist_map1[x, y]:
+
+                            dist_map2[x, y] = img[x, y]
+                            break
+
+                        else:
+                            dist_map2[x, y] = dist_map1[x, y]
+
+                    y += 1
+
+                x += 1
+
+            weight_map = class_weight_map + w0 * np.exp(- ((dist_map1 + dist_map2) ** 2 / (2 * sigma ** 2)))
+
+            return weight_map
 
         print("Starting Augmentation \n")
 
@@ -196,17 +265,32 @@ class Augment(object):
         # iterate through folder, merge label, original images and save to merged folder
         for count, image in enumerate(os.listdir(path_train)):
 
+            print(image)
+
             x_t = cv2.imread(path_train + "/" + image, cv2.IMREAD_GRAYSCALE)
             x_l = cv2.imread(path_label + "/" + image, cv2.IMREAD_GRAYSCALE)
-            x_w = np.zeros((x_l.shape[0], x_l.shape[1]))
+
+
+            if wmap == False:
+                x_w = np.zeros((x_l.shape[0], x_l.shape[1]))
+
+            else:
+                #create weight map
+                x_w = create_weight_map(x_l)
 
             # create empty array (only 0s) with shape (x,y, number of channels)
             aug_img = np.zeros((x_t.shape[0], x_l.shape[1], 3))
 
             # setting each channel to label, empty array and original
+
             aug_img[:, :, 2] = x_l
             aug_img[:, :, 1] = x_w
             aug_img[:, :, 0] = x_t
+
+            if wmap == True:
+                #increasing intensity values of label images (to 255 if value was > 0)
+                for x in np.nditer(aug_img[:,:,2], op_flags=['readwrite']):
+                    x[...] = x * 255
 
 
             # write final merged image
@@ -221,6 +305,8 @@ class Augment(object):
                 os.mkdir(savedir)
 
             self.doAugmentate(img, savedir, image, imgnum)
+
+
 
     def doAugmentate(self, img, save_to_dir, save_prefix, imgnum , batch_size=1, save_format='tif'):
 
@@ -239,7 +325,7 @@ class Augment(object):
             if i >= imgnum:
                 break
 
-    def splitMerge(self):
+    def splitMerge(self, wmap):
 
         print("Splitting merged images")
 
@@ -248,6 +334,7 @@ class Augment(object):
         """
         path_merge = self.aug_merge_path
         path_train = self.aug_train_path
+        path_weights = self.aug_weights_path
         path_label = self.aug_label_path
 
 
@@ -257,6 +344,17 @@ class Augment(object):
 
             train_imgs = glob.glob(path + "/*." + self.img_type)
 
+
+            def save_dir(path):
+                savedir = path + "/" + image
+                if not os.path.lexists(savedir):
+                    os.mkdir(savedir)
+
+
+            save_dir(path_train)
+            save_dir(path_label)
+
+            """
             savedir = path_train + "/" + image
             if not os.path.lexists(savedir):
                 os.mkdir(savedir)
@@ -264,6 +362,10 @@ class Augment(object):
             savedir = path_label + "/" + image
             if not os.path.lexists(savedir):
                 os.mkdir(savedir)
+            """
+
+            if wmap == True:
+                save_dir(path_weights)
 
 
             for imgname in train_imgs:
@@ -275,6 +377,10 @@ class Augment(object):
 
                 cv2.imwrite(path_train + "/" + image + "/" + midname, img_train)
                 cv2.imwrite(path_label + "/" + image + "/" + midname, img_label)
+
+                if wmap==True:
+                    img_weights = img[:, :, 1]
+                    cv2.imwrite(path_weights + "/" + image + "/" + midname, img_weights)
 
         print("\nsplitMerge finished")
 
@@ -297,7 +403,8 @@ class Create_npy_files(object):
         self.npy_path = npy_path
         self.weight_path = weight_path
 
-    def create_train_data(self):
+
+    def create_train_data(self, wmap):
 
         """
         adding all image data to one numpy array file (npy)
@@ -319,6 +426,7 @@ class Create_npy_files(object):
 
         imgdatas = np.ndarray((len(imgs), self.out_rows, self.out_cols, 1), dtype=np.uint8)
         imglabels = np.ndarray((len(imgs), self.out_rows, self.out_cols, 1), dtype=np.uint8)
+        imgweights = np.ndarray((len(imgs), self.out_rows, self.out_cols, 1), dtype=np.uint8)
 
 
         for imgname in imgs:
@@ -337,6 +445,16 @@ class Create_npy_files(object):
             imgdatas[i] = img
             imglabels[i] = label
 
+            if wmap==True:
+
+                weights = cv2.imread(self.weight_path + "/" + midname,cv2.IMREAD_GRAYSCALE)
+
+                weights = np.array([weights])
+                weights = weights.reshape((width, height, 1))
+
+                imgweights[i] = weights
+
+
 
             if i % 100 == 0:
                 print('Done: {0}/{1} images'.format(i, len(imgs)))
@@ -348,11 +466,14 @@ class Create_npy_files(object):
         np.save(self.npy_path + '/imgs_train.npy', imgdatas)
         np.save(self.npy_path + '/imgs_mask_train.npy', imglabels)
 
+        if wmap==True:
+            np.save(self.npy_path + '/imgs_weights.npy', imgweights)
+
         print('Saving to .npy files done.')
 
 
-    # is used in unet.py script
-    def load_train_data(self):
+    # is used in MitoSegNet script
+    def load_train_data(self, wmap):
 
         print('-' * 30)
         print('Load train images...')
@@ -370,9 +491,19 @@ class Create_npy_files(object):
         imgs_mask_train[imgs_mask_train > 0.5] = 1
         imgs_mask_train[imgs_mask_train <= 0.5] = 0
 
-        return imgs_train, imgs_mask_train
+        if wmap==True:
 
-    # is used in MitoSegNet.py script
+            imgs_weights = np.load(self.npy_path + "/imgs_weights.npy")
+            imgs_weights = imgs_weights.astype('float32')
+
+            return imgs_train, imgs_mask_train, imgs_weights
+
+        else:
+
+            return imgs_train, imgs_mask_train
+
+
+    # is used in MitoSegNet script
     def create_test_data(self):
 
         """
@@ -472,7 +603,7 @@ class Create_npy_files(object):
 
         return mod_imgs
 
-    # used in MitoSegNet.py script
+    # used in MitoSegNet script
     def load_test_data(self):
 
         print('-' * 30)
@@ -496,13 +627,14 @@ if __name__ == "__main__":
 
     print("New image size is: ", width,"x",height)
 
-    aug = Augment()
+    wmap = True
 
-    aug.start_augmentation(imgnum=100)
-    aug.splitMerge()
+    aug = Augment()
+    aug.start_augmentation(imgnum=80, wmap=wmap)
+    aug.splitMerge(wmap=wmap)
 
     mydata = Create_npy_files(width, height)
-    mydata.create_train_data()
+    mydata.create_train_data(wmap=wmap)
 
 
 
