@@ -40,6 +40,7 @@ No weight map is used
 """
 
 import numpy as np
+import math
 import os
 import copy
 import glob
@@ -66,12 +67,100 @@ class Preprocess(object):
         self.label_path = label_path
 
 
-    def splitImgs(self):
-
+    def poss_tile_sizes(self):
 
         """
-        split original images into 4 tiles of equal width and length
+        get corresponding tile sizes and number of tiles per raw image
         """
+
+        path_raw = self.raw_path
+
+        for img in os.listdir(path_raw + "/image"):
+            read_img = cv2.imread(path_raw + "/image/" + img, -1)
+            y,x = read_img.shape
+
+            break
+
+        size = 16
+
+        while size < max([y, x]) / 2 + 16:
+
+            x_tile = math.ceil(x / size)
+            y_tile = math.ceil(y / size)
+
+            x_overlap = (np.abs(x - x_tile * size)) / (x_tile - 1)
+            y_overlap = (np.abs(y - y_tile * size)) / (y_tile - 1)
+
+            if (x_overlap.is_integer() and y_overlap.is_integer()) and (x_tile * y_tile) % 2 == 0:
+                print("tile size (px):", size, "number of tiles: ", x_tile * y_tile)
+
+            size += 16
+
+
+
+
+    def find_tile_pos(self, x, y, tile_size, start_x, end_x, start_y, end_y, column, row):
+
+        """
+        :param x:
+        :param y:
+        :param tile_size:
+        :param start_x:
+        :param end_x:
+        :param start_y:
+        :param end_y:
+        :param column:
+        :param row:
+        :return: start x, end x, start y and end y coordinates for tile position
+        """
+
+        x_tile = math.ceil(x / tile_size)
+        y_tile = math.ceil(y / tile_size)
+
+        x_overlap = (np.abs(x - x_tile * tile_size)) / (x_tile - 1)
+        y_overlap = (np.abs(y - y_tile * tile_size)) / (y_tile - 1)
+
+        # if column greater equal 1 then set start_x and end_x as follows
+        if column >= 1:
+            start_x = int(column * tile_size - column * x_overlap)
+            end_x = int(start_x + tile_size)
+
+        # if row greater equal 1 then set start_y and end_y as follows
+        if row >= 1:
+            start_y = int((row) * tile_size - (row) * y_overlap)
+            end_y = int(start_y + tile_size)
+
+        # if column is equal to number of x tiles, reset start_x, end_x and column (moving to next row)
+        if column == x_tile:
+            start_x = 0
+            end_x = tile_size
+
+            column = 0
+
+        # if column greater equal number of x tiles -1, add 1 to row (moving to next column)
+        if column >= x_tile - 1 and row < y_tile - 1:
+            row += 1
+
+        column += 1
+
+
+        return start_x, end_x, start_y, end_y, column, row
+
+
+    def splitImgs(self, tile_size, n_tiles):
+
+        """
+        split original images into n tiles of equal width and length
+
+        :param tile_size:
+        :param n_tiles:
+        :return:
+        """
+
+        if n_tiles%2!=0 or tile_size%16!=0:
+            print("Incorrect number of tiles or tile size not divisible by 16.\nAborting")
+            exit()
+
 
         path_train = self.train_path
         path_label = self.label_path
@@ -91,44 +180,36 @@ class Preprocess(object):
                 exit()
 
             read_lab = cv2.imread(path_raw + "/label/" + img, cv2.IMREAD_GRAYSCALE)
-
-
-            # get y and x resolution of image
             y, x = read_img.shape
 
-            # get highest resolution and divide by 2
-            size = max(read_img.shape) / 2
+            if tile_size > max(y,x)/2+16:
+                print("Tile size to big.\nAborting")
+                exit()
 
-            # add 2 to size until size%16 = 0, the final value will determine the size of the 4 sub-images into which the
-            # main image will be divided
-            while size % 16 != 0:
-                size += 2
 
-            final_size = int(size)
+            # splitting image into n tiles of predefined size
+            #############
 
-            def split_image(image, savedir):
+            start_y = 0
+            start_x = 0
+            end_y = tile_size
+            end_x = tile_size
 
-                # upper left corner (pic[y,x])
-                u_l = image[0:final_size, 0:final_size]
+            column = 0
+            row = 0
 
-                # upper right corner
-                u_r = image[0:final_size, x - final_size:x]
+            for i in range(n_tiles):
 
-                # lower left corner
-                l_l = image[y - final_size:y, 0:final_size]
+                start_x, end_x, start_y, end_y, column, row = self.find_tile_pos(x, y, tile_size, start_x, end_x, start_y, end_y,
+                                                                    column, row)
 
-                # lower right corner
-                l_r = image[y - final_size:y, x - final_size:x]
+                image_tile_train = read_img[start_y:end_y, start_x:end_x]
+                image_tile_label = read_lab[start_y:end_y, start_x:end_x]
 
-                cv2.imwrite(savedir + "/" + "0_" + img, u_l)
-                cv2.imwrite(savedir + "/" + "1_" + img, u_r)
-                cv2.imwrite(savedir + "/" + "2_" + img, l_l)
-                cv2.imwrite(savedir + "/" + "3_" + img, l_r)
+                cv2.imwrite(path_train + "/" + str(i) + "_" + img, image_tile_train)
+                cv2.imwrite(path_label + "/" + str(i) + "_" + img, image_tile_label)
 
-            split_image(read_img, path_train)
-            split_image(read_lab, path_label)
-
-        return final_size
+                #############
 
 
 class Augment(object):
@@ -166,7 +247,10 @@ class Augment(object):
 
         # ImageDataGenerator performs augmentation on original images
         self.datagen = ImageDataGenerator(
-            shear_range=0.1,  # 0.005
+
+            shear_range=0.2,  # originally set to 0.1
+            rotation_range=180,
+            zoom_range=0.2,
             horizontal_flip=True,
             vertical_flip=True,
             width_shift_range=0.2,
@@ -175,12 +259,10 @@ class Augment(object):
 
 
 
-
-
     def start_augmentation(self, imgnum, wmap):
 
 
-        def create_weight_map(label, w0=10, sigma=5):
+        def create_distance_weight_map(label, w0=10, sigma=5):
 
             # creating first parameter of weight map formula
             class_weight_map = np.ones_like(label)
@@ -244,6 +326,7 @@ class Augment(object):
 
             return weight_map
 
+
         print("Starting Augmentation \n")
 
         """
@@ -276,7 +359,7 @@ class Augment(object):
 
             else:
                 #create weight map
-                x_w = create_weight_map(x_l)
+                x_w = create_distance_weight_map(x_l)
 
             # create empty array (only 0s) with shape (x,y, number of channels)
             aug_img = np.zeros((x_t.shape[0], x_l.shape[1], 3))
@@ -288,6 +371,10 @@ class Augment(object):
             aug_img[:, :, 0] = x_t
 
             if wmap == True:
+
+                #aug_img[:, :, 2][aug_img[:, :, 2]>1] = 255
+                #aug_img[:, :, 2][aug_img[:, :, 2] <= 1] = 0
+
                 #increasing intensity values of label images (to 255 if value was > 0)
                 for x in np.nditer(aug_img[:,:,2], op_flags=['readwrite']):
                     x[...] = x * 255
@@ -305,7 +392,6 @@ class Augment(object):
                 os.mkdir(savedir)
 
             self.doAugmentate(img, savedir, image, imgnum)
-
 
 
     def doAugmentate(self, img, save_to_dir, save_prefix, imgnum , batch_size=1, save_format='tif'):
@@ -350,7 +436,6 @@ class Augment(object):
                 if not os.path.lexists(savedir):
                     os.mkdir(savedir)
 
-
             save_dir(path_train)
             save_dir(path_label)
 
@@ -385,14 +470,15 @@ class Augment(object):
         print("\nsplitMerge finished")
 
 
-class Create_npy_files(object):
+class Create_npy_files(Preprocess):
 
     def __init__(self, out_rows, out_cols, data_path="data/aug_train", label_path="data/aug_label",
                  test_path="data/test", weight_path="data/aug_weights", npy_path="data/npydata", img_type="tif"):
 
-        """
 
-        """
+
+        Preprocess.__init__(self, train_path="data/train/image", label_path="data/train/label",
+                            raw_path = "data/train/RawImgs", img_type=img_type)
 
         self.out_rows = out_rows
         self.out_cols = out_cols
@@ -455,7 +541,6 @@ class Create_npy_files(object):
                 imgweights[i] = weights
 
 
-
             if i % 100 == 0:
                 print('Done: {0}/{1} images'.format(i, len(imgs)))
             i += 1
@@ -471,9 +556,26 @@ class Create_npy_files(object):
 
         print('Saving to .npy files done.')
 
+    def check_class_balance(self):
+
+        label_array = np.load(self.npy_path + "/imgs_mask_train.npy")
+
+        tile_size = label_array[0].shape[0]
+
+        l = []
+        for count, i in enumerate(label_array):
+
+            b = len(i[i == 0])
+            l.append(b / (tile_size ** 2))
+
+        av = np.average(l)
+
+        print("Average percentage of 0 pixels in label array:", av)
+        print("Foreground to background pixel ratio:", 1, "to", math.ceil(1/(1-av)))
+
 
     # is used in MitoSegNet script
-    def load_train_data(self, wmap):
+    def load_train_data(self, wmap, vbal):
 
         print('-' * 30)
         print('Load train images...')
@@ -496,6 +598,9 @@ class Create_npy_files(object):
             imgs_weights = np.load(self.npy_path + "/imgs_weights.npy")
             imgs_weights = imgs_weights.astype('float32')
 
+            # setting background pixel weights to vbal (because of class imbalance)
+            imgs_weights[imgs_weights == 1] = vbal
+
             return imgs_train, imgs_mask_train, imgs_weights
 
         else:
@@ -504,7 +609,7 @@ class Create_npy_files(object):
 
 
     # is used in MitoSegNet script
-    def create_test_data(self):
+    def create_test_data(self, tile_size, n_tiles):
 
         """
         adding all image data to one numpy array file (npy)
@@ -517,14 +622,13 @@ class Create_npy_files(object):
         print('Creating test images...')
         print('-' * 30)
 
-        print(glob.glob(self.test_path + "/*"))
+        #print(glob.glob(self.test_path + "/*"))
         imgs = glob.glob(self.test_path + "/*")
 
         # added 05/12/18 to avoid underscores causing problems when stitching images back together
         if any("_" in s for s in imgs):
 
             for img in imgs:
-
                 new_img = img.replace("_", "-")
                 os.rename(img, new_img)
 
@@ -551,50 +655,45 @@ class Create_npy_files(object):
             part = x.split("/")
 
             c = 0
-            while c <= 3:
+            while c <= n_tiles-1:
                 mod_imgs.append(part[0] + "/" + part[1] + "/" + str(c) + "_" + part[2])
-                c+=1
+                c += 1
 
         ################
 
-        imgdatas = np.ndarray((len(imgs)*4, self.out_rows, self.out_cols, 1), dtype=np.uint8)
-
+        imgdatas = np.ndarray((len(imgs) * n_tiles, self.out_rows, self.out_cols, 1), dtype=np.uint8)
 
         for imgname in imgs:
             print(imgname)
 
             img = cv2.imread(imgname, cv2.IMREAD_GRAYSCALE)
+            cop_img = copy.copy(img)
 
             # insert split into 4 sub-images here
             ################################################### (09/11/18)
 
             y, x = img.shape
-            size = max(img.shape) / 2
 
-            while size % 16 != 0:
-                size += 2
+            start_y = 0
+            start_x = 0
+            end_y = tile_size
+            end_x = tile_size
 
-            final_size = int(size)
+            column = 0
+            row = 0
 
-            def test_splitter(img_corner, i, final_size = final_size):
+            for n in range(n_tiles):
 
-                img = img_corner
-                img = img.reshape((final_size, final_size, 1))
+                start_x, end_x, start_y, end_y, column, row = self.find_tile_pos(x, y, tile_size, start_x, end_x,
+                                                                                 start_y, end_y, column, row)
+
+                img_tile = cop_img[start_y:end_y, start_x:end_x]
+
+                img = img_tile.reshape((tile_size, tile_size, 1))
 
                 imgdatas[i] = img
 
                 i+=1
-
-                return i
-
-            # upper left corner (pic[y,x])
-            i = test_splitter(img[0:final_size, 0:final_size], i)
-            # upper right corner
-            i = test_splitter(img[0:final_size, x - final_size:x], i)
-            # lower left corner
-            i = test_splitter(img[y - final_size:y, 0:final_size], i)
-            # lower right corner
-            i= test_splitter(img[y - final_size:y, x - final_size:x], i)
 
 
         print('Loading done')
@@ -602,6 +701,7 @@ class Create_npy_files(object):
         print('Saving to imgs_test.npy files done.')
 
         return mod_imgs
+
 
     # used in MitoSegNet script
     def load_test_data(self):
@@ -620,21 +720,26 @@ class Create_npy_files(object):
 
 if __name__ == "__main__":
 
-    split = Preprocess()
+    preproc = Preprocess()
 
-    width = split.splitImgs()
+    #preproc.poss_tile_sizes()
+
+    n_tiles = 6
+    width = 576
     height = width
 
-    print("New image size is: ", width,"x",height)
+    preproc.splitImgs(width, n_tiles)
 
     wmap = True
 
     aug = Augment()
-    aug.start_augmentation(imgnum=80, wmap=wmap)
-    aug.splitMerge(wmap=wmap)
+    #aug.start_augmentation(imgnum=4, wmap=wmap)
+    #aug.splitMerge(wmap=wmap)
 
     mydata = Create_npy_files(width, height)
-    mydata.create_train_data(wmap=wmap)
+
+    #mydata.create_train_data(wmap=wmap)
+    #mydata.check_class_balance()
 
 
 
