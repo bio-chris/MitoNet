@@ -17,6 +17,7 @@ import cv2
 from skimage.measure import regionprops, label
 import os
 from scipy.stats.mstats import mannwhitneyu, normaltest, ttest_ind
+from scipy.stats import energy_distance
 import pandas as pd
 import seaborn as sb
 import matplotlib.pyplot as plt
@@ -30,9 +31,8 @@ warnings.simplefilter("ignore", UserWarning)
 ###################################################################################################
 
 
-path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
-       "segmentation_comparison/Cross_Validation/Third_CV/Complete_images/"
-
+#path = "C:/Users/Christian/Desktop/Third_CV/Complete_images/"
+path = "C:/Users/Christian/Desktop/Third_CV/Image_sections/sections/"
 
 # Get image data
 #################################
@@ -59,6 +59,8 @@ def morph_distribution(path, seg_name):
 
 
     def significance(pvalue):
+
+        #"""
         if pvalue > 0.05:
             return 0
 
@@ -70,12 +72,15 @@ def morph_distribution(path, seg_name):
 
         if pvalue < 0.001:
             return 3
+        #"""
+
+        return pvalue
+
 
 
     for gt_image, seg_image in zip(gt_image_list, seg_image_list):
 
         print(gt_image)
-
 
         gt = cv2.imread(gt_folder_path + "/" + gt_image, cv2.IMREAD_GRAYSCALE)
         seg = cv2.imread(seg_folder_path + "/" + seg_image, cv2.IMREAD_GRAYSCALE)
@@ -93,7 +98,6 @@ def morph_distribution(path, seg_name):
         # compare shape descriptor distributions
         #################################
 
-
         # Area
         gt_area = [i.area for i in gt_reg_props]
         seg_area = [i.area for i in seg_reg_props]
@@ -110,8 +114,10 @@ def morph_distribution(path, seg_name):
         list_ecc.append(significance(pvalue_ecc))
 
         # Aspect ratio
-        gt_ar = [i.major_axis_length/i.minor_axis_length for i in gt_reg_props]
-        seg_ar = [i.major_axis_length/i.minor_axis_length for i in seg_reg_props]
+
+
+        gt_ar = [i.major_axis_length/i.minor_axis_length for i in gt_reg_props if i.minor_axis_length != 0]
+        seg_ar = [i.major_axis_length/i.minor_axis_length for i in seg_reg_props if i.minor_axis_length != 0]
 
         pvalue_ar = mannwhitneyu(gt_ar, seg_ar)[1]
         list_ar.append(significance(pvalue_ar))
@@ -127,6 +133,8 @@ def morph_distribution(path, seg_name):
         gt_sol = [i.solidity for i in gt_reg_props]
         seg_sol = [i.solidity for i in seg_reg_props]
 
+        #print(len(gt_sol))
+
         pvalue_sol = mannwhitneyu(gt_sol, seg_sol)[1]
         list_sol.append(significance(pvalue_sol))
 
@@ -134,8 +142,8 @@ def morph_distribution(path, seg_name):
 
         def show(gt, seg):
 
-            sb.distplot(gt, color="green")
-            sb.distplot(seg, color="red")
+            sb.kdeplot(gt, color="green", shade=True)
+            sb.kdeplot(seg, color="red", shade=True)
             plt.show()
 
         def norm(gt, seg):
@@ -144,17 +152,29 @@ def morph_distribution(path, seg_name):
             print(normaltest(seg)[1])
 
 
-        norm(gt_area, seg_area)
-        norm(gt_ecc, seg_ecc)
-        norm(gt_ar, seg_ar)
-        norm(gt_per, seg_per)
-        norm(gt_sol, seg_sol)
+        #norm(gt_area, seg_area)
+        #norm(gt_ecc, seg_ecc)
+        #norm(gt_ar, seg_ar)
+        #norm(gt_per, seg_per)
+        #norm(gt_sol, seg_sol)
 
+        """
         #show(gt_area, seg_area)
+        #print(pvalue_area)
+        print(energy_distance(gt_area, seg_area))
         #show(gt_ecc, seg_ecc)
+        #print(pvalue_ecc)
+        print(energy_distance(gt_ecc, seg_ecc))
         #show(gt_ar, seg_ar)
+        #print(pvalue_ar)
+        print(energy_distance(gt_ar, seg_ar))
         #show(gt_per, seg_per)
+        #print(pvalue_per)
+        print(energy_distance(gt_per, seg_per))
         #show(gt_sol, seg_sol)
+        #print(pvalue_sol)
+        print(energy_distance(gt_sol, seg_sol))
+        """
 
 
 
@@ -195,8 +215,9 @@ def morph_distribution(path, seg_name):
     #print(three_p/total_values)
 
 
+
     # raw data
-    #df.to_csv(path  + "U-Net10_Morph_Dist_comparison.csv")
+    #df.to_csv(path  + seg_name + "_Morph_Dist_comparison.csv")
 
 
 
@@ -205,4 +226,5 @@ def morph_distribution(path, seg_name):
 
 # morph distribution comparison
 
-morph_distribution(path, "U-Net/10_epochs")
+seg_name = "Fiji_U-Net_pretrained"
+morph_distribution(path, seg_name)

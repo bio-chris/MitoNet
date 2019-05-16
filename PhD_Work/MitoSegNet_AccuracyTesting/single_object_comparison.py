@@ -48,11 +48,14 @@ import warnings
 warnings.simplefilter("ignore", UserWarning)
 warnings.simplefilter("ignore", FutureWarning)
 
-path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
-       "segmentation_comparison/Cross_Validation/Third_CV/Complete_images/"
+#path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
+#       "segmentation_comparison/Cross_Validation/Third_CV/Complete_images/"
 
-save_path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
-       "segmentation_comparison/Cross_Validation/Third_CV/"
+#save_path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
+#       "segmentation_comparison/Cross_Validation/Third_CV/"
+
+path = "C:/Users/Christian/Desktop/Third_CV/Image_sections/sections/"
+save_path = path
 
 def create_data(path, save_path, seg_name):
 
@@ -107,12 +110,12 @@ def create_data(path, save_path, seg_name):
         #################################
 
         # only add coordinates of objects that have an area of greater than 10 (other objects are disregarded)
-        gt_object_coords = [n.coords.tolist() for n in gt_reg_props] #if n.area >= 10]
-        seg_object_coords = [n.coords.tolist() for n in seg_reg_props] #if n.area >= 10]
+        gt_object_coords = [n.coords.tolist() for n in gt_reg_props if n.area >= 10]
+        seg_object_coords = [n.coords.tolist() for n in seg_reg_props if n.area >= 10]
 
         # list of same length as object_coords, containing label information
-        gt_object_labels = [n.label for n in gt_reg_props] #if n.area >= 10]
-        seg_object_labels = [n.label for n in seg_reg_props] #if n.area >= 10]
+        gt_object_labels = [n.label for n in gt_reg_props if n.area >= 10]
+        seg_object_labels = [n.label for n in seg_reg_props if n.area >= 10]
 
 
         """
@@ -669,7 +672,7 @@ def create_data(path, save_path, seg_name):
 
             image_dictionary[gt_img].append([dev_dic[i]])
 
-        data.to_csv(save_path + "Object_Comparison_Data" + "/" + gt_img + ".csv")
+        data.to_csv(save_path + "/" + gt_img + ".csv")
 
         ##########################
 
@@ -729,7 +732,7 @@ def create_data(path, save_path, seg_name):
     for i in error_counting_dictionary:
         error_data[i] = error_counting_dictionary[i]
 
-    error_data.to_csv(save_path + "U-Net10" + "_error_counting_data.csv")
+    error_data.to_csv(save_path + seg_name + "_error_counting_data.csv")
 
     ###########
 
@@ -820,17 +823,18 @@ def analyse_data(path, seg_name):
 
 
 
-    sb.distplot(np.log(analysed_data["area"]))
+    #sb.distplot(np.log(analysed_data["area"]))
 
+    analysed_data.to_csv(save_path + "/" + seg_name + "_analysed_data.csv")
 
 
 
 #single object comparison + object error analysis
 
-#seg_name = "U-Net10"
+seg_name = "MitoSegNet"
 
 #create_data(path, save_path, seg_name)
-analyse_data(save_path, "Ilastik")
+analyse_data(save_path, seg_name)
 #analyse_data(save_path, "Hessian")
 
 #plt.show()

@@ -15,16 +15,23 @@ from Plot_Significance import significance_bar
 from scipy.stats import chisquare, chi2_contingency
 
 
-path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
-       "segmentation_comparison/Cross_Validation/Third_CV/Morph_Distribution_Comparison"
+#path = "C:/Users/Christian/Desktop/Third_CV/Morph_Distribution_Comparison"
+path = "C:/Users/Christian/Desktop/Third_CV/Image_sections/Morph_distribution_comparison"
 
 
 file_list = os.listdir(path)
 
 # switch list element at position 2 with list element at position 3 (ilastik<>laplacian)
-file_list[2], file_list[3] = file_list[3], file_list[2]
+#file_list[2], file_list[3] = file_list[3], file_list[2]
+#file_list[6], file_list[5] = file_list[5], file_list[6]
 
-#s = []
+file_list = ['MitoSegNet_Morph_Dist_comparison.csv', 'Fiji_U-Net_pretrained_Morph_Dist_comparison.csv' ,
+             'Ilastik_Morph_Dist_comparison.csv', 'Gaussian_Morph_Dist_comparison.csv', 'Hessian_Morph_Dist_comparison.csv',
+             'Laplacian_Morph_Dist_comparison.csv']
+
+#print(file_list)
+
+s = []
 
 s1 = []
 s2 = []
@@ -48,8 +55,8 @@ for file in file_list:
         # removing first column
         table.drop(table.columns[[0]], axis=1, inplace=True)
 
-        #total_values = 60
-        total_values = 15
+        total_values = 60
+        #total_values = 15
 
         zero_p = 0
         one_p = 0
@@ -58,21 +65,21 @@ for file in file_list:
 
         for (index, row), phenotype in zip(table.iterrows(), phenotypes):
 
-            if phenotype == "fragmented":
+            #if phenotype == "fragmented":
 
-                for column in row:
+            for column in row:
 
-                    if column == 0:
-                        zero_p += 1
+                if column == 0:
+                    zero_p += 1
 
-                    elif column == 1:
-                        one_p += 1
+                elif column == 1:
+                    one_p += 1
 
-                    elif column == 2:
-                        two_p += 1
+                elif column == 2:
+                    two_p += 1
 
-                    elif column == 3:
-                        three_p += 1
+                elif column == 3:
+                    three_p += 1
 
 
         #print(zero_p/total_values)
@@ -81,6 +88,8 @@ for file in file_list:
         #print(three_p/total_values)
 
         ns.append(zero_p/total_values)
+        s.append((total_values-zero_p)/total_values)
+
         s1.append(one_p/total_values)
         s2.append(two_p/total_values)
         s3.append(three_p/total_values)
@@ -96,24 +105,27 @@ for file in file_list:
 
 print(observed_values)
 
-# 0: gaussian, 1: hessian, 2: laplacian, 3: ilastik, 4: mitonet
+# 0: mitosegnet, 1: pretrained fiji unet, 2: ilastik, 3: gaussian, 4: hessian, 5: laplacian
 
-f_obs_gauss = [observed_values[0], observed_values[-1]]
-f_obs_hess = [observed_values[1], observed_values[-1]]
-f_obs_lapl = [observed_values[2], observed_values[-1]]
-f_obs_ilast = [observed_values[3], observed_values[-1]]
+f_obs_gauss = [observed_values[0], observed_values[3]]
+f_obs_hess = [observed_values[0], observed_values[4]]
+f_obs_lapl = [observed_values[0], observed_values[5]]
+f_obs_ilast = [observed_values[0], observed_values[2]]
+f_obs_pt_fu = [observed_values[0], observed_values[1]]
 
 p_ga = chi2_contingency(f_obs_gauss, correction=False)[1]
 p_he = chi2_contingency(f_obs_hess, correction=False)[1]
 p_la = chi2_contingency(f_obs_lapl, correction=False)[1]
 p_il = chi2_contingency(f_obs_ilast, correction=False)[1]
+p_pt_fu = chi2_contingency(f_obs_pt_fu, correction=False)[1]
 
-"""
-print("gaussian:", p_ga)
-print("hessian:", p_he)
-print("laplacian:", p_la)
-print("ilastik:", p_il)
-"""
+
+print(p_he)
+print(p_la)
+print(p_ga)
+print(p_il)
+print(p_pt_fu)
+#print("fiji u-net:", p_fu)
 
 def star_counter(pvalue):
 
@@ -129,35 +141,48 @@ def star_counter(pvalue):
     if pvalue < 0.001:
         return 3
 
+# "Gaussian", "Hessian", "Laplacian", "Ilastik", "MitoSegNet", "Pretrained\nFiji U-Net", "Fiji U-Net"
 
-
-ind = ["Gaussian", "Hessian", "Laplacian", "Ilastik", "MitoNet"]
+ind = ["MitoSegNet", "Pretrained\nFiji U-Net", "Ilastik", "Gaussian", "Hessian", "Laplacian"]
 
 # ilastik vs mitonet
-significance_bar(pos_y=1.1, pos_x=[3, 4], bar_y=0.03, p=star_counter(p_il), y_dist=0.03, distance=0.11)
+significance_bar(pos_y=1.1, pos_x=[0, 1], bar_y=0.03, p=star_counter(p_il), y_dist=0.03, distance=0.15)
 # laplacian vs mitonet
-significance_bar(pos_y=1.2, pos_x=[2, 4], bar_y=0.03, p=star_counter(p_la), y_dist=0.03, distance=0.11)
+significance_bar(pos_y=1.2, pos_x=[0, 2], bar_y=0.03, p=star_counter(p_la), y_dist=0.03, distance=0.15)
 # hessian vs mitonet
-significance_bar(pos_y=1.3, pos_x=[1, 4], bar_y=0.03, p=star_counter(p_he), y_dist=0.03, distance=0.11)
+significance_bar(pos_y=1.3, pos_x=[0, 3], bar_y=0.03, p=star_counter(p_he), y_dist=0.03, distance=0.15)
 # gaussian vs mitonet
-significance_bar(pos_y=1.4, pos_x=[0, 4], bar_y=0.03, p=star_counter(p_ga), y_dist=0.03, distance=0.11)
+significance_bar(pos_y=1.4, pos_x=[0, 4], bar_y=0.03, p=star_counter(p_ga), y_dist=0.03, distance=0.15)
+
+significance_bar(pos_y=1.5, pos_x=[0, 5], bar_y=0.03, p=star_counter(p_ga), y_dist=0.03, distance=0.15)
+#significance_bar(pos_y=1.3, pos_x=[4, 6], bar_y=0.03, p=star_counter(p_ga), y_dist=0.03, distance=0.15)
 
 
 # creating stacked bar graph
-p1 = plt.bar(ind, ns)
-p2 = plt.bar(ind, s1, bottom=ns, color="rosybrown")
-p3 = plt.bar(ind, s2, bottom=[i+j for i,j in zip(ns, s1)], color="firebrick")
-p4 = plt.bar(ind, s3, bottom=[i+j+n for i,j,n in zip(ns, s1, s2)], color="red")
+
+#p1 = plt.bar(ind, ns, color="white", edgecolor="black")
+#p2 = plt.bar(ind, s, bottom=ns, color="black", edgecolor="black")
+
+
+p1 = plt.bar(ind, ns, color="white", edgecolor="black")
+p2 = plt.bar(ind, s, bottom=ns, color="black", edgecolor="black")
+#p3 = plt.bar(ind, s2, bottom=[i+j for i,j in zip(ns, s1)], color="grey", edgecolor="black")
+#p4 = plt.bar(ind, s3, bottom=[i+j+n for i,j,n in zip(ns, s1, s2)], color="black", edgecolor="black")
 
 
 
-plt.ylabel("Percentage of morphological comparisons (tubular phenotype)")
+plt.ylabel("p-value frequency", size=32)
 
 #plt.legend((p1[0], p2[0], p3[0], p4[0]), ('p>0.05', 'p<0.05', 'p<0'), loc="upper left")
 
-plt.legend((p1[0], p2[0], p3[0], p4[0]), ('p>0.05', '0.01<p<0.05', '0.001<p<0.01', 'p<0.001'),
-           prop={"size": 10}, bbox_to_anchor=(1, 0.5))
+#plt.legend((p1[0], p2[0], p3[0], p4[0]), ('p>0.05', '0.01<p<0.05', '0.001<p<0.01', 'p<0.001'),
+#           prop={"size": 12}, bbox_to_anchor=(1, 0.5))
 
+plt.legend((p1[0], p2[0]), ('p>0.05', 'p<0.05'),
+           prop={"size": 20}, bbox_to_anchor=(1, 0.5))
+
+plt.tick_params(axis="x", labelsize=28, rotation=45)
+plt.tick_params(axis="y", labelsize=28)
 
 plt.show()
 

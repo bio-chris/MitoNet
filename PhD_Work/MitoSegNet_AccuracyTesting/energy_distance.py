@@ -41,8 +41,7 @@ warnings.simplefilter("ignore", UserWarning)
 ###################################################################################################
 ###################################################################################################
 
-org_path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
-            "segmentation_comparison/Cross_Validation/Third_CV/"
+org_path = "C:/Users/Christian/Desktop/Third_CV/"
 
 path = org_path + "Complete_images/"
 save_path = org_path + "Morph_Energy_Distance/"
@@ -185,7 +184,7 @@ def get_energy_distance(path, save_path, seg_name):
 
 # morph distribution comparison
 
-get_energy_distance(path, save_path, "Ilastik")
+get_energy_distance(path, save_path, "Fiji_U-Net")
 
 
 
