@@ -48,14 +48,12 @@ import warnings
 warnings.simplefilter("ignore", UserWarning)
 warnings.simplefilter("ignore", FutureWarning)
 
-#path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
-#       "segmentation_comparison/Cross_Validation/Third_CV/Complete_images/"
+path = "C:/Users/Christian/Desktop/Fourth_CV/Complete_images/"
 
-#save_path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
-#       "segmentation_comparison/Cross_Validation/Third_CV/"
+save_path = "C:/Users/Christian/Desktop/Fourth_CV/Object_Comparison_Data_WithSplitMerge/"
 
-path = "C:/Users/Christian/Desktop/Third_CV/Image_sections/sections/"
-save_path = path
+#path = "C:/Users/Christian/Desktop/Third_CV/Image_sections/sections/"
+#save_path = path
 
 def create_data(path, save_path, seg_name):
 
@@ -67,6 +65,16 @@ def create_data(path, save_path, seg_name):
     gt_path_imgs = os.listdir(gt_path)
     seg_path_imgs = os.listdir(seg_path)
 
+    ###########
+
+    seg_path_imgs = os.listdir(path + "MitoSegNet")
+    gt_path_imgs = seg_path_imgs
+
+    ###########
+
+    org_path = path + "Original"
+    org_path_imgs = os.listdir(org_path)
+
     image_dictionary = {}
 
     for image in gt_path_imgs:
@@ -77,12 +85,14 @@ def create_data(path, save_path, seg_name):
                                  "falsely split": [], "falsely added": [], "missing": []}
 
     # loop through ground truth and segmentation folder
-    for gt_img, seg_img in zip(gt_path_imgs, seg_path_imgs):
+    for gt_img, seg_img, org_img in zip(gt_path_imgs, seg_path_imgs, org_path_imgs):
 
         print(gt_img, "\n")
 
         gt = cv2.imread(gt_path + "/" + gt_img, cv2.IMREAD_GRAYSCALE)
         seg = cv2.imread(seg_path + "/" + seg_img, cv2.IMREAD_GRAYSCALE)
+
+        org = cv2.imread(org_path + "/" + org_img, cv2.IMREAD_GRAYSCALE)
 
         # label image mask
         gt_labelled = label(gt)
@@ -91,8 +101,8 @@ def create_data(path, save_path, seg_name):
         # Get region props of image data
         #################################
 
-        gt_reg_props = regionprops(gt_labelled)
-        seg_reg_props = regionprops(seg_labelled)
+        gt_reg_props = regionprops(label_image=gt_labelled, intensity_image=org)
+        seg_reg_props = regionprops(label_image=seg_labelled, intensity_image=org)
 
         gt_props_dic = {}
         seg_props_dic = {}
@@ -179,7 +189,6 @@ def create_data(path, save_path, seg_name):
         print("100 %")
 
         print("\n", "=== Object comparison completed ===", "\n")
-
 
 
 
@@ -303,7 +312,8 @@ def create_data(path, save_path, seg_name):
 
         """
 
-        dev_dic = {"objects": [], "area": [], "aspect ratio": [], "eccentricity": [], "perimeter": [], "solidity": []}
+        dev_dic = {"objects": [], "area": [], "aspect ratio": [], "eccentricity": [], "perimeter": [], "solidity": [],
+                   "mean intensity": []}
 
         # regular comparison (no split or merge events)
         ##########################
@@ -406,7 +416,6 @@ def create_data(path, save_path, seg_name):
 
                 """
 
-
                 dev_per = i[2].perimeter / i[1].perimeter
 
                 if dev_per < 1:
@@ -417,12 +426,18 @@ def create_data(path, save_path, seg_name):
                 if dev_sol < 1:
                     dev_sol = 1 / dev_sol
 
+                dev_mean_int = i[2].mean_intensity / i[1].mean_intensity
+
+                if dev_mean_int < 1:
+                    dev_mean_int = 1 / dev_mean_int
+
                 dev_dic["objects"].append(i[0])
                 dev_dic["area"].append(dev_area)
                 dev_dic["aspect ratio"].append(dev_ar)
                 dev_dic["eccentricity"].append(dev_ecc)
                 dev_dic["perimeter"].append(dev_per)
                 dev_dic["solidity"].append(dev_sol)
+                dev_dic["mean intensity"].append(dev_mean_int)
 
 
             # if no corresponding objects are found (either missing or falsely added)
@@ -437,7 +452,7 @@ def create_data(path, save_path, seg_name):
                 dev_dic["eccentricity"].append(None)
                 dev_dic["perimeter"].append(None)
                 dev_dic["solidity"].append(None)
-
+                dev_dic["mean intensity"].append(None)
 
 
         # comparison of objects with false split events
@@ -461,6 +476,7 @@ def create_data(path, save_path, seg_name):
             l_ecc = []
             l_per = []
             l_sol = []
+            l_int = []
 
 
             if len(dic_split[i]) != 0:
@@ -475,6 +491,7 @@ def create_data(path, save_path, seg_name):
                         gt_ecc = i2.eccentricity
                         gt_per = i2.perimeter
                         gt_sol = i2.solidity
+                        gt_int = i2.mean_intensity
 
 
                     else:
@@ -485,7 +502,7 @@ def create_data(path, save_path, seg_name):
                         l_ecc.append(i2[1].eccentricity)
                         l_per.append(i2[1].perimeter)
                         l_sol.append(i2[1].solidity)
-
+                        l_int.append(i2[1].mean_intensity)
 
 
                 dev_area = np.average(l_area) / gt_area
@@ -498,7 +515,6 @@ def create_data(path, save_path, seg_name):
 
                 if dev_ar < 1:
                     dev_ar = 1 / dev_ar
-
 
 
                 ########################################
@@ -545,6 +561,11 @@ def create_data(path, save_path, seg_name):
                 if dev_sol < 1:
                     dev_sol = 1 / dev_sol
 
+                dev_int = np.average(l_int) / gt_int
+
+                if dev_int < 1:
+                    dev_int = 1 / dev_int
+
                 if len(o_l) > 1:
                     dev_dic["objects"].append(o_l)
 
@@ -553,6 +574,7 @@ def create_data(path, save_path, seg_name):
                     dev_dic["eccentricity"].append(dev_ecc)
                     dev_dic["perimeter"].append(dev_per)
                     dev_dic["solidity"].append(dev_sol)
+                    dev_dic["mean intensity"].append(dev_int)
 
         # comparison of objects with false merge events
         ##########################
@@ -575,6 +597,7 @@ def create_data(path, save_path, seg_name):
             l_ecc = []
             l_per = []
             l_sol = []
+            l_int = []
 
 
             # only run it if any false merges have been found
@@ -589,6 +612,7 @@ def create_data(path, save_path, seg_name):
                         seg_ecc = i2.eccentricity
                         seg_per = i2.perimeter
                         seg_sol = i2.solidity
+                        seg_int = i2.mean_intensity
 
                     else:
 
@@ -599,6 +623,7 @@ def create_data(path, save_path, seg_name):
                         l_ecc.append(i2[1].eccentricity)
                         l_per.append(i2[1].perimeter)
                         l_sol.append(i2[1].solidity)
+                        l_int.append(i2[1].mean_intensity)
 
                 o_l.append([i])
 
@@ -654,6 +679,12 @@ def create_data(path, save_path, seg_name):
                 if dev_sol < 1:
                     dev_sol = 1 / dev_sol
 
+
+                dev_int = seg_int / np.average(l_int)
+
+                if dev_int < 1:
+                    dev_int = 1 / dev_int
+
                 if len(o_l) > 1:
                     dev_dic["objects"].append(o_l)
                     dev_dic["area"].append(dev_area)
@@ -661,6 +692,7 @@ def create_data(path, save_path, seg_name):
                     dev_dic["eccentricity"].append(dev_ecc)
                     dev_dic["perimeter"].append(dev_per)
                     dev_dic["solidity"].append(dev_sol)
+                    dev_dic["mean intensity"].append(dev_int)
 
         # creating empty data frame for csv file (raw data) creation
         ##########################
@@ -675,7 +707,6 @@ def create_data(path, save_path, seg_name):
         data.to_csv(save_path + "/" + gt_img + ".csv")
 
         ##########################
-
 
         """
         (value, None): missing 
@@ -740,9 +771,8 @@ def create_data(path, save_path, seg_name):
 def analyse_data(path, seg_name):
 
 
-    path = path + "Object_Comparison_Data_Raw/" + seg_name
+    path = path + os.sep + seg_name
     path_data = os.listdir(path)
-
 
 
     average_dictionary = {"image": [], "area": [], "aspect ratio": [], "eccentricity": [],
@@ -757,20 +787,21 @@ def analyse_data(path, seg_name):
         new_ecc_l = []
         new_per_l = []
         new_sol_l = []
+        #new_int_l = []
 
         for obj, area, ar, ecc, per, sol in zip(data["objects"], data["area"], data["aspect ratio"],
-                                                data["eccentricity"],
-                                                data["perimeter"], data["solidity"]):
+                                                     data["eccentricity"], data["perimeter"], data["solidity"]):
 
             # print(type(obj))
 
-            if "None" not in obj and "[" not in obj:
+            if "None" not in obj:  #and "[" not in obj:
             #if "[" in obj and "None" not in obj:
                 new_area_l.append(area)
                 new_ar_l.append(ar)
                 new_ecc_l.append(ecc)
                 new_per_l.append(per)
                 new_sol_l.append(sol)
+                #new_int_l.append(int)
 
         # print(csv_file)
         # sb.distplot(new_area_l)
@@ -785,6 +816,7 @@ def analyse_data(path, seg_name):
         average_dictionary["eccentricity"].append(np.nanmean(new_ecc_l))
         average_dictionary["perimeter"].append(np.nanmean(new_per_l))
         average_dictionary["solidity"].append(np.nanmean(new_sol_l))
+        #average_dictionary["mean intensity"].append(np.nanmean(new_int_l))
         # """
 
         """
@@ -828,13 +860,12 @@ def analyse_data(path, seg_name):
     analysed_data.to_csv(save_path + "/" + seg_name + "_analysed_data.csv")
 
 
-
 #single object comparison + object error analysis
 
 seg_name = "MitoSegNet"
-
 #create_data(path, save_path, seg_name)
 analyse_data(save_path, seg_name)
-#analyse_data(save_path, "Hessian")
 
+
+#analyse_data(save_path, "Hessian")
 #plt.show()

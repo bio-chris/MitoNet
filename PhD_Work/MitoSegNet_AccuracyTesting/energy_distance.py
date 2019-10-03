@@ -41,7 +41,7 @@ warnings.simplefilter("ignore", UserWarning)
 ###################################################################################################
 ###################################################################################################
 
-org_path = "C:/Users/Christian/Desktop/Third_CV/"
+org_path = "C:/Users/Christian/Desktop/Fourth_CV/"
 
 path = org_path + "Complete_images/"
 save_path = org_path + "Morph_Energy_Distance/"
@@ -70,7 +70,14 @@ def get_energy_distance(path, save_path, seg_name):
     list_per = []
     list_sol = []
 
+    ###################################################
 
+    path_temp = "C:/Users/Christian/Desktop/Fourth_CV/Complete_images/MitoSegNet"
+
+    gt_image_list = os.listdir(path_temp)
+    seg_image_list = gt_image_list
+
+    ###################################################
 
 
     for gt_image, seg_image in zip(gt_image_list, seg_image_list):
@@ -178,13 +185,18 @@ def get_energy_distance(path, save_path, seg_name):
     df.to_csv(save_path + seg_name + "_EnergyDistance.csv")
 
 
-
 ###################################################################################################
 ###################################################################################################
 
 # morph distribution comparison
 
 get_energy_distance(path, save_path, "Fiji_U-Net")
+get_energy_distance(path, save_path, "MitoSegNet")
+get_energy_distance(path, save_path, "Gaussian")
+get_energy_distance(path, save_path, "Laplacian")
+get_energy_distance(path, save_path, "Hessian")
+get_energy_distance(path, save_path, "Ilastik")
+
 
 
 

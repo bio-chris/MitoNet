@@ -13,29 +13,45 @@ import matplotlib.pyplot as plt
 import seaborn as sb
 
 
-filename = "MitoNet_Training_History.xlsx"
-path = "C:/Users/Christian/Documents/Work/Project_Celegans_Mitochondria_Segmentation/Unet_Segmentation/quantiative_" \
-       "segmentation_comparison/Cross_Validation/Third_CV/Validation_data/" + filename
+filename = "Final_MitoSegNet_656_training_log.csv"
+path = "C:/Users/Christian/Desktop/Fourth_CV/Validation_data/" + filename
 
 
-table = pd.read_excel(path)
+table = pd.read_csv(path)
 
-
-
-l = np.linspace(0,0.0,20)
-print(l)
-print(len(l))
 
 #sb.lineplot(x=20*[5], y=l)
-p1 = plt.axvline(x=5, color="black", label="Stopping point")
-p2 = sb.lineplot(x=table["epoch"], y=table["dice_coefficient"], label="Training")
-p3 = sb.lineplot(x=table["epoch"], y=table["val_dice_coefficient"], label="Validation").set(xlabel="Epoch", ylabel="Dice coefficient")
+#p1 = plt.axvline(x=5, color="black", linewidth=3)
+p2 = sb.lineplot(x=list(range(1,21)), y=table["dice_coefficient"], color="red", linewidth=3)
+p3 = sb.lineplot(x=list(range(1,21)), y=table["val_dice_coefficient"], color="blue", linewidth=3)
+
+
+#.set(xlabel="Epoch", ylabel="Dice coefficient")
 
 #plt.legend((p1, p2, p3), ("Minimum validation loss", "Training", "Validation"),
 #           prop={"size": 10}, bbox_to_anchor=(1, 0.5))
 
-#plt.legend(bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
-plt.legend(loc="lower right")
+
+
+p3.set_ylabel("Dice coefficient", fontsize=32)
+p3.set_xlabel("Epochs", fontsize=32)
+
+
+
+p3.tick_params(axis="x", labelsize=26)
+
+#xint = [0, 5, 10, 15, 20]
+#plt.xticks(xint)
+
+p3.tick_params(axis="y", labelsize=26)
+
+#plt.legend(('Minimum validation loss', 'Training', 'Validation'), prop={"size": 26}, loc="upper right")
+plt.legend(('Training', 'Validation'), prop={"size": 26}, loc="lower right")
+
+#plt.legend(('Minimum validation loss', 'Training', 'Validation'), prop={"size": 20},
+#           bbox_to_anchor=(1.05, 1), loc=2, borderaxespad=0.)
+
+plt.margins(x=0)
 
 plt.show()
 
